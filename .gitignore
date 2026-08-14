@@ -1,0 +1,5 @@
+hsm
+hsmd
+*.o
+.hedlog
+tags
