@@ -62,5 +62,5 @@ into a fresh session), `reap()` (the `waitpid` loop and restart throttle),
 timeout), and `handleclient()` (the whole wire protocol — it's just text
 lines). Knobs live in `config.h`.
 
-Deliberately not here (yet): log rotation, service dependencies, readiness
-notification, running as pid 1.
+Deliberately not here (yet): service dependencies, readiness notification,
+restart backoff, running as pid 1.
