@@ -17,7 +17,8 @@ the **foreground**:
 
 - `exec` so signals reach the real process, not a leftover shell.
 - A file named `down` in the service directory means "don't start at boot".
-- Service stdout/stderr append to `log` in the service directory.
+- Service stdout/stderr land in `log` in the service directory, rotated to
+  `log.0`, `log.1`, ... past `logsize` bytes (`logkeep` old files are kept).
 - Existing runit run scripts work as-is.
 
 ## Usage
@@ -45,6 +46,11 @@ restarts), `term` (SIGTERM sent, waiting for it to die).
   seconds, so a crashing service can't spin the CPU.
 - `hsmd` is a child subreaper (`prctl`), so orphans of double-forking
   services are reaped instead of becoming init's problem.
+- Service output flows through a pipe held by hsmd rather than straight
+  into a file: that is what makes rotation possible while the service
+  runs (a child writing to its own fd would follow the renamed file
+  forever). The pipe outlives restarts, so grandchild output keeps
+  landing in the same log. Rotation itself lives in `log.c`.
 - Stopping hsmd (SIGTERM/SIGINT) stops every service and waits for them
   before exiting.
 

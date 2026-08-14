@@ -13,8 +13,9 @@
  * signals its whole tree: SIGTERM first, SIGKILL killwait seconds later.
  *
  * hsmd runs in the foreground and logs to stderr; start it from your session
- * (.xinitrc, a terminal, another supervisor).  Service stdout/stderr are
- * appended to a "log" file inside the service directory.
+ * (.xinitrc, a terminal, another supervisor).  Service stdout/stderr flow
+ * through a pipe into hsmd and land in a rotated "log" file inside the
+ * service directory (see log.c).
  */
 #include <dirent.h>
 #include <errno.h>
@@ -35,6 +36,7 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "log.h"
 
 enum { SDOWN, SUP, STERM }; /* run state: stopped, running, SIGTERM sent */
 enum { WANTDOWN, WANTUP };  /* what the user asked for */
@@ -48,6 +50,10 @@ typedef struct {
   long started;  /* monotonic seconds at last exec */
   long deadline; /* when to act next: restart a throttled service (SDOWN)
                   * or escalate SIGTERM to SIGKILL (STERM); 0 = now/none */
+  int outfd;     /* read end of the service's stdout/stderr pipe, -1 = none */
+  int infd;      /* write end; we keep it too so the pipe survives restarts
+                  * (no EOF handling, grandchild output still lands here) */
+  Log log;       /* rotated <servicedir>/log fed from outfd, see log.c */
 } Service;
 
 static Service sv[MAXSV];
@@ -144,6 +150,7 @@ static void scan(void) {
     s = &sv[nsv++];
     memset(s, 0, sizeof(*s));
     memcpy(s->name, e->d_name, len + 1);
+    s->outfd = s->infd = s->log.fd = -1;
     s->state = SDOWN;
     s->want = stat(svpath(s->name, "down"), &st) == 0 ? WANTDOWN : WANTUP;
     s->seen = 1;
@@ -158,6 +165,11 @@ static void scan(void) {
       sv[i].want = WANTDOWN;
       if (!sv[i].pid) {
         fprintf(stderr, "hsmd: dropping removed service %s\n", sv[i].name);
+        if (sv[i].outfd >= 0) {
+          close(sv[i].outfd);
+          close(sv[i].infd);
+        }
+        logclose(&sv[i].log);
         sv[i] = sv[--nsv];
         continue;
       }
@@ -166,11 +178,36 @@ static void scan(void) {
   }
 }
 
+/* one pipe + log per service, created on first start and kept forever */
+static void openlog(Service *s) {
+  int p[2];
+
+  if (s->outfd >= 0)
+    return;
+  if (pipe2(p, O_CLOEXEC) < 0) {
+    fprintf(stderr, "hsmd: pipe %s: %s\n", s->name, strerror(errno));
+    return; /* service inherits hsmd's stderr instead */
+  }
+  fcntl(p[0], F_SETFL, O_NONBLOCK); /* read end only: pipe ends are
+                                     * separate open file descriptions */
+  s->outfd = p[0];
+  s->infd = p[1];
+  logopen(&s->log, svpath(s->name, NULL));
+}
+
+static void drainlog(Service *s) {
+  char buf[4096];
+  ssize_t n;
+
+  while (s->outfd >= 0 && (n = read(s->outfd, buf, sizeof(buf))) > 0)
+    logwrite(&s->log, buf, (size_t)n);
+}
+
 static void start(Service *s) {
   sigset_t empty;
   pid_t pid;
-  int logfd;
 
+  openlog(s);
   pid = fork();
   if (pid < 0) {
     fprintf(stderr, "hsmd: fork %s: %s\n", s->name, strerror(errno));
@@ -183,12 +220,9 @@ static void start(Service *s) {
     setsid(); /* own session + process group: kill(-pid) hits the tree */
     if (chdir(svpath(s->name, NULL)) < 0)
       _exit(127);
-    logfd = open("log", O_WRONLY | O_APPEND | O_CREAT, 0644);
-    if (logfd >= 0) {
-      dup2(logfd, 1);
-      dup2(logfd, 2);
-      if (logfd > 2)
-        close(logfd);
+    if (s->infd >= 0) { /* dup2 clears O_CLOEXEC on the copies */
+      dup2(s->infd, 1);
+      dup2(s->infd, 2);
     }
     execl("./run", "./run", (char *)NULL);
     _exit(127);
@@ -412,7 +446,9 @@ static void opensocket(void) {
 }
 
 int main(void) {
-  struct pollfd pfd[2];
+  struct pollfd pfd[2 + MAXSV];
+  int svof[2 + MAXSV]; /* pfd slot -> sv[] index */
+  int i, nfds;
 
   homepath(svroot, sizeof(svroot), svdir);
   homepath(sockfile, sizeof(sockfile), sockpath);
@@ -436,17 +472,31 @@ int main(void) {
     int timeout = tick();
     if (shuttingdown && alldead())
       break;
-    if (poll(pfd, 2, timeout) < 0) {
+    /* the service pipes come and go, so rebuild their slots every round */
+    for (i = 0, nfds = 2; i < nsv; i++)
+      if (sv[i].outfd >= 0) {
+        pfd[nfds].fd = sv[i].outfd;
+        pfd[nfds].events = POLLIN;
+        svof[nfds++] = i;
+      }
+    if (poll(pfd, (nfds_t)nfds, timeout) < 0) {
       if (errno == EINTR)
         continue;
       die("poll");
     }
+    /* drain pipes first: handlesignals/handleclient may rescan and
+     * reorder sv[], which would invalidate the svof mapping */
+    for (i = 2; i < nfds; i++)
+      if (pfd[i].revents & POLLIN)
+        drainlog(&sv[svof[i]]);
     if (pfd[0].revents & POLLIN)
       handlesignals();
     if (pfd[1].revents & POLLIN)
       handleclient();
   }
 
+  for (i = 0; i < nsv; i++)
+    drainlog(&sv[i]); /* catch the services' last words */
   unlink(sockfile);
   fprintf(stderr, "hsmd: bye\n");
   return 0;

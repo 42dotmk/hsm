@@ -6,8 +6,8 @@ BINDIR = $(HOME)/.local/bin
 
 all: hsmd hsm
 
-hsmd: hsmd.c config.h
-	$(CC) $(CFLAGS) -o $@ hsmd.c
+hsmd: hsmd.c log.c log.h config.h
+	$(CC) $(CFLAGS) -o $@ hsmd.c log.c
 
 hsm: hsm.c config.h
 	$(CC) $(CFLAGS) -o $@ hsm.c
