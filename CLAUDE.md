@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-hsm is a runit-style service supervisor for Linux in ~600 lines of C99. Two binaries from two files: `hsmd.c` (daemon: one poll loop supervises every service — no process-per-service like runit) and `hsm.c` (client: joins its args into one text line, sends it over a unix socket, prints the reply). `log.c` holds log rotation. Compile-time config in `config.h` (paths, `throttle`, `killwait`, log rotation knobs, `MAXSV`/`NAMEMAX`), suckless style.
+hsm is a runit-style service supervisor for Linux in ~600 lines of C11. Two binaries from two files: `hsmd.c` (daemon: one poll loop supervises every service — no process-per-service like runit) and `hsm.c` (client: joins its args into one text line, sends it over a unix socket, prints the reply). `log.c` holds log rotation. Compile-time config in `config.h` (paths, `throttle`, `killwait`, log rotation knobs, `MAXSV`/`NAMEMAX`), suckless style.
 
 ## Build and test
 
@@ -12,7 +12,7 @@ hsm is a runit-style service supervisor for Linux in ~600 lines of C99. Two bina
     make install    # symlinks into ~/.local/bin
     make clean
 
-No test suite or linter; `-std=c99 -pedantic -Wall -Wextra` must stay clean. Test by hand: create a throwaway service dir (a subdirectory of `svdir`, default `~/.config/hsm/sv`, containing an executable `run` script that execs a foreground process), run `./hsmd` in a terminal (it runs in the foreground and logs to stderr), drive it with `./hsm` (`status` / `up NAME` / `down NAME` / `restart NAME` / `rescan`). A second hsmd refuses to start if the socket is connectable.
+No test suite or linter; `-std=c11 -pedantic -Wall -Wextra` must stay clean. Test by hand: create a throwaway service dir (a subdirectory of `svdir`, default `~/.config/hsm/sv`, containing an executable `run` script that execs a foreground process), run `./hsmd` in a terminal (it runs in the foreground and logs to stderr), drive it with `./hsm` (`status` / `up NAME` / `down NAME` / `restart NAME` / `rescan`). A second hsmd refuses to start if the socket is connectable.
 
 ## Architecture
 
@@ -33,4 +33,4 @@ Deliberately absent (don't add without being asked): service dependencies, readi
 
 ## Style
 
-2-space indent, `/* */` comments, lowercase names, C99, fixed-size arrays. Keep it small and readable; prefer deleting features to adding flags. The sibling projects (hed, hws, hwm, htray) share the makefile/install shape.
+2-space indent, `/* */` comments, lowercase names, C11, fixed-size arrays. Keep it small and readable; prefer deleting features to adding flags. The sibling projects (hed, hws, hwm, htray) share the makefile/install shape.

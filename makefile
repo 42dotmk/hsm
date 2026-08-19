@@ -6,7 +6,7 @@ CC     = cc
 # the exact tag/commit they were built from; "dev" without git metadata.
 VERSION != git describe --tags --always --dirty 2>/dev/null || echo dev
 
-CFLAGS = -std=c99 -pedantic -Wall -Wextra -Os -D_GNU_SOURCE \
+CFLAGS = -std=c11 -pedantic -Wall -Wextra -Os -D_GNU_SOURCE \
          -DHSM_VERSION='"$(VERSION)"'
 BINDIR = $(HOME)/.local/bin
 
