@@ -29,8 +29,12 @@ int main(int argc, char *argv[]) {
   size_t off;
   ssize_t n;
 
+  if (argc > 1 && !strcmp(argv[1], "-v")) {
+    printf("hsm %s\n", HSM_VERSION);
+    return 0;
+  }
   if (argc > 1 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help"))) {
-    fprintf(stderr, "usage: hsm [status | up NAME | down NAME | "
+    fprintf(stderr, "usage: hsm [-v] [status | up NAME | down NAME | "
                     "restart NAME | rescan]\n");
     return 1;
   }

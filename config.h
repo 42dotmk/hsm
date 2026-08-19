@@ -1,6 +1,10 @@
 /* hsm configuration.
  * Paths starting with '/' are absolute; anything else is relative to $HOME. */
 
+#ifndef HSM_VERSION
+#define HSM_VERSION "dev" /* the makefile injects `git describe` here */
+#endif
+
 static const char svdir[]    = ".config/hsm/sv";       /* one subdir per service */
 static const char sockpath[] = ".config/hsm/hsm.sock"; /* control socket */
 

@@ -445,11 +445,19 @@ static void opensocket(void) {
     die("listen");
 }
 
-int main(void) {
+int main(int argc, char *argv[]) {
   struct pollfd pfd[2 + MAXSV];
   int svof[2 + MAXSV]; /* pfd slot -> sv[] index */
   int i, nfds;
 
+  if (argc == 2 && !strcmp(argv[1], "-v")) {
+    printf("hsmd %s\n", HSM_VERSION);
+    return 0;
+  }
+  if (argc > 1) {
+    fprintf(stderr, "usage: hsmd [-v]\n");
+    return 1;
+  }
   homepath(svroot, sizeof(svroot), svdir);
   homepath(sockfile, sizeof(sockfile), sockpath);
   mkpath(svroot);
