@@ -33,4 +33,4 @@ Deliberately absent (don't add without being asked): service dependencies, readi
 
 ## Style
 
-2-space indent, `/* */` comments, lowercase names, C11, fixed-size arrays. Keep it small and readable; prefer deleting features to adding flags. The sibling projects (hed, hws, hwm, htray) share the makefile/install shape.
+clang-format via the repo's `.clang-format` (shared across the siblings: 4-space indent, attached braces, 80 columns), `/* */` comments, lowercase names, C11, fixed-size arrays. Keep it small and readable; prefer deleting features to adding flags. The sibling projects (hed, hws, hwm, htray) share the makefile/install shape.
